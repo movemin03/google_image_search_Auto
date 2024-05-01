@@ -9,13 +9,14 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 import time
 import pandas as pd
-import subprocess
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from pywinauto.application import Application
 from io import BytesIO
 import cv2
 from skimage.metrics import structural_similarity as ssim
+from datetime import datetime
+from PIL.ExifTags import TAGS
 
 while True:
     # 사용자로부터 경로 입력 받기
@@ -48,6 +49,33 @@ chk_dest_dir(dest_dir)
 # 파일 용량 체크
 def check_size(file):
     return os.path.getsize(file)
+
+def extract_image_metadata(image_path):
+    # 이미지 열기
+    image = Image.open(image_path)
+
+    # exif 데이터 추출
+    exif_data = image._getexif()
+
+    # 추출한 데이터를 저장할 딕셔너리
+    metadata = {}
+
+    if exif_data:
+        for tag, value in exif_data.items():
+            tag_name = TAGS.get(tag, tag)
+            metadata[tag_name] = value
+
+    # 찍은 날짜, 만든 날짜, 수정한 날짜, 프로그램 이름 추출
+    taken_date = metadata.get('DateTimeOriginal', "기록된 값이 없습니다")
+    created_date = metadata.get('DateTime', "기록된 값이 없습니다")
+    modified_date = os.path.getmtime(image_path)
+    program_name = metadata.get('Software', "기록된 값이 없습니다")
+
+    # Unix 타임스탬프를 날짜 형식으로 변환
+    modified_date = datetime.fromtimestamp(modified_date)
+
+    return taken_date, created_date, modified_date, program_name
+
 
 # 이미지 압축
 def compress_image(image_path, output_folder, desired_size, idx):
@@ -91,9 +119,12 @@ filename_list = []
 url_list = []
 similarity_list = []
 searched_url_list = []
+taken_date_list = []
+created_date_list = []
+modified_date_list = []
+program_name_list = []
+
 wait = WebDriverWait(driver, 5)
-
-
 
 def calculate_ssim(image1, image2):
     # 이미지를 그레이스케일로 변환
@@ -192,9 +223,20 @@ def find_image_url(path):
             break
         time.sleep(1)
         print("페이지가 이동될 때까지 대기중: 이미지 업로드가 제대로 되었는지 확인")
+        try:
+            app["열기"].Button1.click()
+        except:
+            pass
     url_list.append(new_url)
 
     filename_list.append(get_value_by_index(index_table, int(os.path.splitext(os.path.basename(path))[0])))
+    taken_date, created_date, modified_date, program_name = extract_image_metadata(get_value_by_index(index_table, int(os.path.splitext(os.path.basename(path))[0])))
+
+    taken_date_list.append(taken_date)
+    created_date_list.append(created_date)
+    modified_date_list.append(modified_date)
+    program_name_list.append(program_name)
+
     print("검색 url 저장 완료")
     wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="yDmH0d"]/c-wiz/div/div[2]/div/c-wiz/div/div[1]/div/div[1]/div[2]/span/div[1]/button/span/div')))
     target_div = driver.find_element(By.CLASS_NAME, "aah4tc")
@@ -222,7 +264,7 @@ for file in os.listdir(upper_path):
 # 데이터프레임 생성 및 저장
 driver.quit()
 
-df = pd.DataFrame({'파일명': filename_list, '구글 검색 url': url_list, '유사도': similarity_list, '유사 이미지 링크': searched_url_list})
+df = pd.DataFrame({'파일명': filename_list, '구글 검색 url': url_list, '유사도': similarity_list, '유사 이미지 링크': searched_url_list, '찍은 날짜': taken_date_list, '만든 날짜': created_date_list, '수정한 날짜': modified_date_list, '프로그램 이름': program_name_list})
 while True:
     try:
         df.to_excel(f"C:\\Users\\{user}\\Desktop\\img_links.xlsx", index=False)
