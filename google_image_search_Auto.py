@@ -1,8 +1,10 @@
 import os
 import numpy as np
+import requests
 from PIL import Image
 import shutil
 from selenium import webdriver
+from selenium.common import ElementClickInterceptedException
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 import time
@@ -11,13 +13,23 @@ import subprocess
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from pywinauto.application import Application
-import io
-import base64
+from io import BytesIO
 import cv2
 from skimage.metrics import structural_similarity as ssim
 
-source_dir = input("사진이 들어있는 폴더 경로를 넣어주세요(put your folder path):").replace("'", "").replace('"', "")
+while True:
+    # 사용자로부터 경로 입력 받기
+    source_dir = input("사진이 들어있는 폴더 경로를 넣어주세요(put your folder path):").replace("'", "").replace('"', "")
+
+    # 입력된 경로에 한글이 포함되어 있는지 확인
+    if not any(char >= '\uac00' and char <= '\ud7a3' for char in source_dir):
+        break
+    else:
+        print("한글이 포함된 경로입니다. 영어 경로로 변경해주세요. 한글이 포함되어 있으면 유사도 검사를 실시할 수 없습니다")
+
+print("입력된 경로:", source_dir)
 dest_dir = source_dir + "\\converted"
+
 
 def chk_dest_dir(dest_dir):
     if not os.path.exists(dest_dir):
@@ -67,11 +79,9 @@ process_files(source_dir, dest_dir)
 print(dest_dir + "폴더에 저장되었습니다.")
 
 user = os.getlogin()
-user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.93 Safari/537.36"
-subprocess.Popen(r'C:\Program Files\Google\Chrome\Application\chrome.exe --remote-debugging-port=9222 --user-data-dir="C:\\Users\\' + user + r'\\AppData\\Local\\Google\\Chrome\\User Data"')
+user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Edg/124.0.0.0"
 option = Options()
 option.add_argument(f"user-agent={user_agent}")
-option.add_experimental_option("debuggerAddress", "127.0.0.1:9222")
 driver = webdriver.Chrome(options=option)
 
 driver.get("https://images.google.com/")
@@ -80,6 +90,8 @@ driver.get("https://images.google.com/")
 filename_list = []
 url_list = []
 similarity_list = []
+searched_url_list = []
+wait = WebDriverWait(driver, 5)
 
 
 
@@ -93,16 +105,17 @@ def calculate_ssim(image1, image2):
     return similarity
 
 
-def base64_to_image(base64_string):
+def requests_to_image(searched_string):
     # base64 문자열을 이미지로 디코딩
-    image_data = base64.b64decode(base64_string)
-    image = Image.open(io.BytesIO(image_data))
+    response = requests.get(searched_string)
+    image_data = BytesIO(response.content)
+    image = Image.open(image_data)
     return cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
 
 
-def image_similarity(base64_string, path):
+def image_similarity(searched_string, path):
     # base64 이미지를 이미지로 변환
-    base64_image = base64_to_image(base64_string)
+    base64_image = requests_to_image(searched_string)
     # 파일에서 이미지를 읽어옴
     image2 = cv2.imread(path)
 
@@ -127,10 +140,36 @@ def get_value_by_index(index_table, idx):
 def find_image_url(path):
     print("처리 중")
     driver.get("https://images.google.com/")
+
+    try:
+        driver.switch_to.frame("callout")
+        WebDriverWait(driver, 2).until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), '로그아웃 상태 유지')]")))
+        logout_button = driver.find_element(By.XPATH, "//button[contains(text(), '로그아웃 상태 유지')]")
+        logout_button.click()
+        print("로그아웃 상태 유지 창 처리 완료")
+    except:
+        try:
+            # Chrome으로 전환
+            WebDriverWait(driver, 2).until(
+                EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), '아니오')]")))
+            convert_chrome = driver.find_element(By.XPATH, "//button[contains(text(), '아니오')]")
+            convert_chrome.click()
+            print("크롬으로 전환 창 처리 완료")
+        except:
+            pass
+    print("점검 완료")
+    driver.switch_to.default_content()
+    # 구글 렌즈 접근
     element = WebDriverWait(driver, 10).until(
         EC.presence_of_element_located((By.XPATH, "/html/body/div[1]/div[3]/form/div[1]/div[1]/div[1]/div/div[3]/div[4]"))
     )
-    element.click()
+
+    while True:
+        try:
+            element.click()
+            break
+        except ElementClickInterceptedException:
+            time.sleep(1)
 
     time.sleep(1)
     img_upload_xpath = '//span[contains(text(), "파일을 업로드")]'
@@ -146,33 +185,31 @@ def find_image_url(path):
     app["열기"].Button1.click()
 
     # URL 갱신 확인 후 저장
-    time.sleep(2)  # 페이지 로딩 대기
-    new_url = driver.current_url
+    time.sleep(1)  # 페이지 로딩 대기
+    while True:
+        new_url = driver.current_url
+        if "https://lens.google.com/search?ep=" in new_url:
+            break
+        time.sleep(1)
+        print("페이지가 이동될 때까지 대기중: 이미지 업로드가 제대로 되었는지 확인")
     url_list.append(new_url)
 
     filename_list.append(get_value_by_index(index_table, int(os.path.splitext(os.path.basename(path))[0])))
     print("검색 url 저장 완료")
-    time.sleep(1)
-
-    while True:
-        try:
-            searched_img = driver.find_element(By.XPATH,'//*[@id="yDmH0d"]/c-wiz/div/div[2]/div/c-wiz/div/div[1]/div/div[2]/div/img')
-            break
-        except:
-            # 요소를 찾지 못한 경우, 예외 처리 후 다시 시도
-            print("이미지 업로드를 제대로 완료한 후 엔터")
-            a = input()
-            continue
-    searched_img = driver.find_element(By.XPATH,'//*[@id="yDmH0d"]/c-wiz/div/div[2]/div/c-wiz/div/div[1]/div/div[2]/div/img')
-    base64_string = searched_img.get_attribute("src")
-    base64_string = base64_string.split(',')[1]
-    if base64_string:
-        similarity = image_similarity(base64_string, path) * 100
+    wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="yDmH0d"]/c-wiz/div/div[2]/div/c-wiz/div/div[1]/div/div[1]/div[2]/span/div[1]/button/span/div')))
+    target_div = driver.find_element(By.CLASS_NAME, "aah4tc")
+    searched_item = target_div.find_element(By.XPATH, "./*/*/*/*/*")
+    searched_string = searched_item.get_attribute("data-thumbnail-url")
+    searched_url = searched_item.get_attribute("data-action-url")
+    if searched_string:
+        similarity = image_similarity(searched_string, path) * 100
         print("유사도:", similarity)
     else:
         similarity = 0
+        searched_url = ""
         print("유사도를 검색할 수 없습니다")
     similarity_list.append(similarity)
+    searched_url_list.append(searched_url)
 
 upper_path = dest_dir
 
@@ -183,7 +220,9 @@ for file in os.listdir(upper_path):
         find_image_url(upper_path + "\\" + file)
 
 # 데이터프레임 생성 및 저장
-df = pd.DataFrame({'filename': filename_list, 'url': url_list, '유사도': similarity_list})
+driver.quit()
+
+df = pd.DataFrame({'파일명': filename_list, '구글 검색 url': url_list, '유사도': similarity_list, '유사 이미지 링크': searched_url_list})
 while True:
     try:
         df.to_excel(f"C:\\Users\\{user}\\Desktop\\img_links.xlsx", index=False)
@@ -191,10 +230,10 @@ while True:
         break  # 성공적으로 저장되었으므로 반복문 종료
     except Exception as e:
         print(f"엑셀 파일 저장 중 오류가 발생했습니다: {e}")
-        print("파일이 열려있는 경우 종료해주시고 엔터")
+        print("img_links.xlsx 엑셀 파일이 열려있는 경우 종료해주시고 엔터")
         a = input()
         continue  # 예외가 발생하면 다시 시도
 print("바탕화면에 img_links.xlsx 이름으로 저장되었습니다")
 # 웹드라이버 종료
-driver.quit()
+
 a = input()
