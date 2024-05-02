@@ -1,4 +1,5 @@
 print("구글 이미지로 검색 자동화 프로그램입니다")
+print("SSIM 방식으로 유사도를 평가하고 있습니다")
 import urllib.request
 #인터넷 연결 체크
 def check_internet():
