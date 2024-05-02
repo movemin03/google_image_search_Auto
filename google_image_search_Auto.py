@@ -55,7 +55,12 @@ def chk_dest_dir(dest_dir):
         if os.listdir(dest_dir):
             shutil.rmtree(dest_dir)
             os.makedirs(dest_dir)
-chk_dest_dir(dest_dir)
+try:
+    chk_dest_dir(dest_dir)
+except:
+    print("파일 경로가 아니라 폴더 경로를 넣어주셔야 합니다. 엔터를 누르면 프로그램이 종료됩니다")
+    a = input()
+    exit()
 
 # 파일 용량 체크
 def check_size(file):
