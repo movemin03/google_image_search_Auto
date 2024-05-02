@@ -5,13 +5,13 @@ from PIL import Image
 import shutil
 from selenium import webdriver
 from selenium.common import ElementClickInterceptedException
+from selenium.webdriver import ActionChains, Keys
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 import time
 import pandas as pd
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from pywinauto.application import Application
 from io import BytesIO
 import cv2
 from skimage.metrics import structural_similarity as ssim
@@ -111,8 +111,10 @@ user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTM
 option = Options()
 option.add_argument(f"user-agent={user_agent}")
 driver = webdriver.Chrome(options=option)
-
-driver.get("https://images.google.com/")
+driver.execute_script("window.open()")
+tabs = driver.window_handles
+driver.switch_to.window(tabs[0])
+#driver.get("https://images.google.com/")
 
 # 리스트 초기화
 filename_list = []
@@ -168,27 +170,28 @@ def get_value_by_index(index_table, idx):
     return None  # 인덱스에 해당하는 값이 없는 경우 None 반환
 
 # 함수 정의
-def find_image_url(path):
+def find_image_url(path, rope):
     print("처리 중")
     driver.get("https://images.google.com/")
 
-    try:
-        driver.switch_to.frame("callout")
-        WebDriverWait(driver, 2).until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), '로그아웃 상태 유지')]")))
-        logout_button = driver.find_element(By.XPATH, "//button[contains(text(), '로그아웃 상태 유지')]")
-        logout_button.click()
-        print("로그아웃 상태 유지 창 처리 완료")
-    except:
+    if rope < 3:
         try:
-            # Chrome으로 전환
-            WebDriverWait(driver, 2).until(
-                EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), '아니오')]")))
-            convert_chrome = driver.find_element(By.XPATH, "//button[contains(text(), '아니오')]")
-            convert_chrome.click()
-            print("크롬으로 전환 창 처리 완료")
+            driver.switch_to.frame("callout")
+            WebDriverWait(driver, 2).until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), '로그아웃 상태 유지')]")))
+            logout_button = driver.find_element(By.XPATH, "//button[contains(text(), '로그아웃 상태 유지')]")
+            logout_button.click()
+            print("로그아웃 상태 유지 창 처리 완료")
         except:
-            pass
-    print("점검 완료")
+            try:
+                # Chrome으로 전환
+                WebDriverWait(driver, 2).until(
+                    EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), '아니오')]")))
+                convert_chrome = driver.find_element(By.XPATH, "//button[contains(text(), '아니오')]")
+                convert_chrome.click()
+                print("크롬으로 전환 창 처리 완료")
+            except:
+                pass
+        print("점검 완료")
     driver.switch_to.default_content()
     # 구글 렌즈 접근
     element = WebDriverWait(driver, 10).until(
@@ -203,30 +206,26 @@ def find_image_url(path):
             time.sleep(1)
 
     time.sleep(1)
-    img_upload_xpath = '//span[contains(text(), "파일을 업로드")]'
     element = WebDriverWait(driver, 10).until(
-        EC.presence_of_element_located((By.XPATH, img_upload_xpath))
+        EC.presence_of_element_located((By.CSS_SELECTOR, "div.PXT6cd"))
     )
-    element.click()
-
-    # 이름이 '열기'인 창이 나올 때까지 3초간 대기
-    time.sleep(1)
-    app = Application().connect(title_re="열기")
-    app["열기"].Edit1.set_text(path)
-    app["열기"].Button1.click()
+    tabs = driver.window_handles
+    driver.switch_to.window(tabs[1])
+    driver.get(path)
+    action = ActionChains(driver)
+    action.key_down(Keys.CONTROL).send_keys('a').key_up(Keys.CONTROL).perform()
+    action.key_down(Keys.CONTROL).send_keys('c').key_up(Keys.CONTROL).perform()
+    driver.switch_to.window(tabs[0])
+    action.key_down(Keys.CONTROL).send_keys('v').key_up(Keys.CONTROL).perform()  # Ctrl+V 키 입력
+    action.perform()
 
     # URL 갱신 확인 후 저장
-    time.sleep(1)  # 페이지 로딩 대기
     while True:
         new_url = driver.current_url
         if "https://lens.google.com/search?ep=" in new_url:
             break
         time.sleep(1)
         print("페이지가 이동될 때까지 대기중: 이미지 업로드가 제대로 되었는지 확인")
-        try:
-            app["열기"].Button1.click()
-        except:
-            pass
     url_list.append(new_url)
 
     filename_list.append(get_value_by_index(index_table, int(os.path.splitext(os.path.basename(path))[0])))
@@ -254,12 +253,13 @@ def find_image_url(path):
     searched_url_list.append(searched_url)
 
 upper_path = dest_dir
-
+rope = 0
 # 폴더 내 모든 파일에 대해 반복
 for file in os.listdir(upper_path):
+    rope += 1
     if file.endswith(".jpg") or file.endswith(".png") or file.endswith(".jpeg"):  # 이미지 파일만 처리
         # 함수 호출
-        find_image_url(upper_path + "\\" + file)
+        find_image_url(upper_path + "\\" + file, rope)
 
 # 데이터프레임 생성 및 저장
 driver.quit()
