@@ -1,7 +1,11 @@
 print("구글 이미지로 검색 자동화 프로그램입니다")
 print("SSIM 방식으로 유사도를 평가하고 있습니다")
+ver = "2024-05-03"
+print("ver:", ver)
 import urllib.request
-#인터넷 연결 체크
+
+
+# 인터넷 연결 체크
 def check_internet():
     try:
         urllib.request.urlopen('http://www.google.com', timeout=5)
@@ -95,9 +99,13 @@ def extract_image_metadata(image_path):
 
 
 # 이미지 압축
-def compress_image(image_path, output_folder, desired_size, idx):
+def compress_image(image_path, output_folder, idx, fixed_height=2160):
     img = Image.open(image_path)
-    img.save(f"{output_folder}\\{idx}.jpg", quality=90, optimize=True)
+    width, height = img.size
+    new_width = int(width * (fixed_height / height))
+    new_height = fixed_height
+    resized_img = img.resize((new_width, new_height), Image.LANCZOS)
+    resized_img.save(f"{output_folder}\\{idx}.jpg", quality=90, optimize=True)
 
 index_table = []
 
@@ -114,7 +122,7 @@ def process_files(source_dir, dest_dir):
             if filename.endswith('.jpg') or filename.endswith('.png') or filename.endswith('.jpeg'):
                 # 여기서 필요한 작업을 수행
                 file_path = os.path.join(foldername, filename)
-                compress_image(file_path, dest_dir, 195, idx)  # 이미지 압축
+                compress_image(file_path, dest_dir, idx, fixed_height=2160)  # 이미지 압축
                 index_table.append((file_path, idx))
                 idx += 1
 
@@ -144,15 +152,6 @@ program_name_list = []
 
 wait = WebDriverWait(driver, 5)
 
-def calculate_ssim(image1, image2):
-    # 이미지를 그레이스케일로 변환
-    gray1 = cv2.cvtColor(image1, cv2.COLOR_BGR2GRAY)
-    gray2 = cv2.cvtColor(image2, cv2.COLOR_BGR2GRAY)
-
-    # 유사도 계산
-    (_, similarity) = ssim(gray1, gray2, full=True)
-    return similarity
-
 
 def requests_to_image(searched_string):
     # base64 문자열을 이미지로 디코딩
@@ -162,20 +161,36 @@ def requests_to_image(searched_string):
     return cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
 
 
+def calculate_ssim(image1, image2):
+    # 이미지를 그레이스케일로 변환
+    gray1 = cv2.cvtColor(image1, cv2.COLOR_BGR2GRAY)
+    gray2 = cv2.cvtColor(image2, cv2.COLOR_BGR2GRAY)
+
+    # 유사도 계산
+    (_, similarity) = ssim(gray1, gray2, full=True)
+    return similarity
+
 def image_similarity(searched_string, path):
-    # base64 이미지를 이미지로 변환
-    base64_image = requests_to_image(searched_string)
-    # 파일에서 이미지를 읽어옴
+    # 이미지 읽어오기
+    image1 = requests_to_image(searched_string)
     image2 = cv2.imread(path)
 
-    width = min(base64_image.shape[1], image2.shape[1])
-    height = min(base64_image.shape[0], image2.shape[0])
+    # 가로 세로 통일
+    width = min(image1.shape[1], image2.shape[1])
+    height = min(image1.shape[0], image2.shape[0])
 
-    base64_image = cv2.resize(base64_image, (width, height))
+    image1 = cv2.resize(image1, (width, height))
     image2 = cv2.resize(image2, (width, height))
 
+    # 그레이 스케일로 변경
+    gray1 = cv2.cvtColor(image1, cv2.COLOR_BGR2GRAY)
+    gray2 = cv2.cvtColor(image2, cv2.COLOR_BGR2GRAY)
+
+    # 유사도 계산
+    (_, similarity_matrix) = ssim(gray1, gray2, full=True)
+
     # 이미지 유사도 계산
-    similarity_matrix = calculate_ssim(base64_image, image2)
+    similarity_matrix = calculate_ssim(image1, image2)
     similarity = np.mean(similarity_matrix)
     return similarity
 
@@ -258,7 +273,7 @@ def find_image_url(path, rope):
     searched_string = searched_item.get_attribute("data-thumbnail-url")
     searched_url = searched_item.get_attribute("data-action-url")
     if searched_string:
-        similarity = image_similarity(searched_string, path) * 100
+        similarity = image_similarity(searched_string, path)
         print("2/2: 유사도 검색 완료\n")
     else:
         similarity = 0
@@ -279,12 +294,13 @@ for file in os.listdir(upper_path):
     rope += 1
     if file.endswith(".jpg") or file.endswith(".png") or file.endswith(".jpeg"):  # 이미지 파일만 처리
         print(file_count, "중", rope, "항목 처리 중")
+        print(upper_path + "\\" + file)
         find_image_url(upper_path + "\\" + file, rope)
 
 # 데이터프레임 생성 및 저장
 driver.quit()
 
-df = pd.DataFrame({'파일명': filename_list, '구글 검색 url': url_list, '유사도': similarity_list, '유사 이미지 링크': searched_url_list, '찍은 날짜': taken_date_list, '만든 날짜': created_date_list, '수정한 날짜': modified_date_list, '프로그램 이름': program_name_list})
+df = pd.DataFrame({'파일명': filename_list, '구글 검색 url': url_list, '유사도_ssim방식': similarity_list, '유사 이미지 링크': searched_url_list, '찍은 날짜': taken_date_list, '만든 날짜': created_date_list, '수정한 날짜': modified_date_list, '프로그램 이름': program_name_list})
 while True:
     try:
         df.to_excel(f"C:\\Users\\{user}\\Desktop\\img_links.xlsx", index=False)
