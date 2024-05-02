@@ -1,3 +1,18 @@
+print("구글 이미지로 검색 자동화 프로그램입니다")
+import urllib.request
+#인터넷 연결 체크
+def check_internet():
+    try:
+        urllib.request.urlopen('http://www.google.com', timeout=5)
+        print("인터넷 연결 상태: 연결됨")
+    except urllib.error.URLError:
+        print("인터넷 연결 상태: 연결되지 않음, 인터넷 연결 후 재실행")
+        a = input()
+        exit()
+
+check_internet()
+print("사용에 필요한 모듈을 로딩합니다. 시간이 소요될 수 있습니다")
+
 import os
 import numpy as np
 import requests
@@ -38,12 +53,8 @@ def chk_dest_dir(dest_dir):
     else:
         # 대상 디렉토리가 비어있지 않다면
         if os.listdir(dest_dir):
-            # 사용자에게 삭제 여부를 물어봅니다.
-            answer = input("폴더가 비어있지 않습니다. 모든 항목을 삭제하시겠습니까? (y/n): ")
-            if answer.lower() == 'y':
-                # 'y'라고 답하면 폴더 안의 모든 항목을 삭제합니다.
-                shutil.rmtree(dest_dir)
-                os.makedirs(dest_dir)
+            shutil.rmtree(dest_dir)
+            os.makedirs(dest_dir)
 chk_dest_dir(dest_dir)
 
 # 파일 용량 체크
@@ -87,7 +98,7 @@ index_table = []
 
 # 파일 처리
 def process_files(source_dir, dest_dir):
-    print("처리를 시작합니다. 별도의 안내가 있을 때까지 종료하지 마십시오")
+    print("별도의 안내가 있을 때까지 종료하지 마십시오\n안정된 검색을 위해 용량을 줄이고, 파일명을 변경하고 있습니다")
     for foldername, subfolders, filenames in os.walk(source_dir, topdown=True):
         # 하위 폴더를 제외하도록 설정
         subfolders.clear()
@@ -102,9 +113,9 @@ def process_files(source_dir, dest_dir):
                 idx += 1
 
 # 실행
-print("이미지 전처리 중입니다\n이미지가 많을 시 처리에 시간이 걸릴 수 있습니다")
+print("\n이미지 전처리 중입니다\n이미지가 많을 시 처리에 시간이 걸릴 수 있습니다")
 process_files(source_dir, dest_dir)
-print(dest_dir + "폴더에 저장되었습니다.")
+print("이미지 전처리가 완료되었습니다. 저장폴더: ", dest_dir, "\n")
 
 user = os.getlogin()
 user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Edg/124.0.0.0"
@@ -114,7 +125,6 @@ driver = webdriver.Chrome(options=option)
 driver.execute_script("window.open()")
 tabs = driver.window_handles
 driver.switch_to.window(tabs[0])
-#driver.get("https://images.google.com/")
 
 # 리스트 초기화
 filename_list = []
@@ -171,7 +181,6 @@ def get_value_by_index(index_table, idx):
 
 # 함수 정의
 def find_image_url(path, rope):
-    print("처리 중")
     driver.get("https://images.google.com/")
 
     if rope < 3:
@@ -191,7 +200,7 @@ def find_image_url(path, rope):
                 print("크롬으로 전환 창 처리 완료")
             except:
                 pass
-        print("점검 완료")
+        print("메시지 창 점검 완료")
     driver.switch_to.default_content()
     # 구글 렌즈 접근
     element = WebDriverWait(driver, 10).until(
@@ -236,7 +245,7 @@ def find_image_url(path, rope):
     modified_date_list.append(modified_date)
     program_name_list.append(program_name)
 
-    print("검색 url 저장 완료")
+    print("1/2: 검색 url 저장 완료")
     wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="yDmH0d"]/c-wiz/div/div[2]/div/c-wiz/div/div[1]/div/div[1]/div[2]/span/div[1]/button/span/div')))
     target_div = driver.find_element(By.CLASS_NAME, "aah4tc")
     searched_item = target_div.find_element(By.XPATH, "./*/*/*/*/*")
@@ -244,21 +253,26 @@ def find_image_url(path, rope):
     searched_url = searched_item.get_attribute("data-action-url")
     if searched_string:
         similarity = image_similarity(searched_string, path) * 100
-        print("유사도:", similarity)
+        print("2/2: 유사도 검색 완료\n")
     else:
         similarity = 0
         searched_url = ""
-        print("유사도를 검색할 수 없습니다")
+        print("2/2: 유사도 검색 할 수 없습니다\n")
     similarity_list.append(similarity)
     searched_url_list.append(searched_url)
 
 upper_path = dest_dir
+
+# converted 폴더 전체 파일 갯수 구하기
+file_list = os.listdir(upper_path)
+file_count = len(file_list)
+
 rope = 0
-# 폴더 내 모든 파일에 대해 반복
+# find_image_url 함수 실행
 for file in os.listdir(upper_path):
     rope += 1
     if file.endswith(".jpg") or file.endswith(".png") or file.endswith(".jpeg"):  # 이미지 파일만 처리
-        # 함수 호출
+        print(file_count, "중", rope, "항목 처리 중")
         find_image_url(upper_path + "\\" + file, rope)
 
 # 데이터프레임 생성 및 저장
@@ -272,10 +286,10 @@ while True:
         break  # 성공적으로 저장되었으므로 반복문 종료
     except Exception as e:
         print(f"엑셀 파일 저장 중 오류가 발생했습니다: {e}")
-        print("img_links.xlsx 엑셀 파일이 열려있는 경우 종료해주시고 엔터")
+        print("img_links.xlsx 엑셀 파일이 열려있는 경우 종료해주시고 엔터하면 저장을 재시도합니다")
         a = input()
         continue  # 예외가 발생하면 다시 시도
 print("바탕화면에 img_links.xlsx 이름으로 저장되었습니다")
-# 웹드라이버 종료
+print("엔터를 누르면 프로그램이 종료됩니다")
 
 a = input()
