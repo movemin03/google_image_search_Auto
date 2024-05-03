@@ -192,7 +192,7 @@ def image_similarity(searched_string, path):
 
     # 이미지 유사도 계산
     similarity_matrix = calculate_ssim(image1, image2)
-    similarity = np.mean(similarity_matrix)
+    similarity = np.mean(similarity_matrix) * 100
     return similarity
 
 def get_value_by_index(index_table, idx):
