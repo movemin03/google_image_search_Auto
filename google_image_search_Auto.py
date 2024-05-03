@@ -20,6 +20,7 @@ print("사용에 필요한 모듈을 로딩합니다. 시간이 소요될 수 �
 
 import os
 import numpy as np
+import math
 import requests
 from PIL import Image
 import shutil
@@ -35,7 +36,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from io import BytesIO
 import cv2
 from skimage.metrics import structural_similarity as ssim
-from datetime import datetime
+from datetime import datetime, timedelta
 from PIL.ExifTags import TAGS
 
 while True:
@@ -274,11 +275,11 @@ def find_image_url(path, rope):
     searched_url = searched_item.get_attribute("data-action-url")
     if searched_string:
         similarity = image_similarity(searched_string, path)
-        print("2/2: 유사도 검색 완료\n")
+        print("2/2: 유사도 검색 완료")
     else:
         similarity = 0
         searched_url = ""
-        print("2/2: 유사도 검색 할 수 없습니다\n")
+        print("2/2: 유사도 검색 할 수 없습니다")
     similarity_list.append(similarity)
     searched_url_list.append(searched_url)
 
@@ -290,12 +291,22 @@ file_count = len(file_list)
 
 rope = 0
 # find_image_url 함수 실행
+total_start_time = datetime.now()
+stacked_time = 0
+
 for file in os.listdir(upper_path):
     rope += 1
     if file.endswith(".jpg") or file.endswith(".png") or file.endswith(".jpeg"):  # 이미지 파일만 처리
+        start_time = time.time()
         print(file_count, "중", rope, "항목 처리 중")
-        print(upper_path + "\\" + file)
         find_image_url(upper_path + "\\" + file, rope)
+        end_time = time.time()
+        used_time = end_time - start_time
+        print("처리소모 시간(s):", used_time)
+        stacked_time += used_time
+        stacked_time_total = stacked_time / rope * file_count + 2
+        estimate_time = total_start_time + timedelta(seconds=stacked_time_total)
+        print("예상 작업 종료 시간:", estimate_time, "\n")
 
 # 데이터프레임 생성 및 저장
 driver.quit()
@@ -304,7 +315,7 @@ df = pd.DataFrame({'파일명': filename_list, '구글 검색 url': url_list, '�
 while True:
     try:
         df.to_excel(f"C:\\Users\\{user}\\Desktop\\img_links.xlsx", index=False)
-        print("엑셀 파일이 성공적으로 저장되었습니다.")
+        print("\n엑셀 파일이 성공적으로 저장되었습니다.")
         break  # 성공적으로 저장되었으므로 반복문 종료
     except Exception as e:
         print(f"엑셀 파일 저장 중 오류가 발생했습니다: {e}")
