@@ -22,8 +22,7 @@ print("사용에 필요한 모듈을 로딩합니다. 시간이 소요될 수 �
 # Built-in imports
 import os
 import time
-import datetime
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 # Third-party imports
 import shutil
