@@ -21,7 +21,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from io import BytesIO
 from skimage.metrics import structural_similarity as ssim  # pyinstaller 사용 시, scikit-image 로 hidden-import 할 것
 from PIL.ExifTags import TAGS
-from multiprocessing import Pool, cpu_count
+from multiprocessing import Pool, cpu_count, freeze_support
 
 def check_internet():
     try:
@@ -249,6 +249,7 @@ def find_image_url(path, rope, five_zero_four):
     searched_url_list.append(searched_url)
 
 if __name__ == "__main__":
+    freeze_support()
     print("*****구글 이미지로 검색 자동화 프로그램입니다*****")
     print("notice: 본 프로그램은 SSIM 방식의 유사도 평가방식을 사용합니다")
     ver = "2024-05-04"
