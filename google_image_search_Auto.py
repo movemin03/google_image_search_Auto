@@ -15,29 +15,34 @@ def check_internet():
         a = input()
         exit()
 
+
 check_internet()
 print("사용에 필요한 모듈을 로딩합니다. 시간이 소요될 수 있습니다")
 
+# Built-in imports
 import os
+import time
+import datetime
+from datetime import timedelta
+
+# Third-party imports
+import shutil
+import pandas as pd
 import numpy as np
-import math
 import requests
 from PIL import Image
-import shutil
+import cv2
 from selenium import webdriver
 from selenium.common import ElementClickInterceptedException
 from selenium.webdriver import ActionChains, Keys
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
-import time
-import pandas as pd
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from io import BytesIO
-import cv2
-from skimage.metrics import structural_similarity as ssim
-from datetime import datetime, timedelta
+from skimage.metrics import structural_similarity as ssim  # pyinstaller 사용 시, scikit-image 로 hidden-import 할 것
 from PIL.ExifTags import TAGS
+
 
 while True:
     # 사용자로부터 경로 입력 받기
@@ -61,6 +66,8 @@ def chk_dest_dir(dest_dir):
         if os.listdir(dest_dir):
             shutil.rmtree(dest_dir)
             os.makedirs(dest_dir)
+
+
 try:
     chk_dest_dir(dest_dir)
 except:
@@ -68,9 +75,11 @@ except:
     a = input()
     exit()
 
+
 # 파일 용량 체크
 def check_size(file):
     return os.path.getsize(file)
+
 
 def extract_image_metadata(image_path):
     # 이미지 열기
@@ -108,6 +117,7 @@ def compress_image(image_path, output_folder, idx, fixed_height=2160):
     resized_img = img.resize((new_width, new_height), Image.LANCZOS)
     resized_img.save(f"{output_folder}\\{idx}.jpg", quality=90, optimize=True)
 
+
 index_table = []
 
 
@@ -126,6 +136,7 @@ def process_files(source_dir, dest_dir):
                 compress_image(file_path, dest_dir, idx, fixed_height=2160)  # 이미지 압축
                 index_table.append((file_path, idx))
                 idx += 1
+
 
 # 실행
 print("\n이미지 전처리 중입니다\n이미지가 많을 시 처리에 시간이 걸릴 수 있습니다")
@@ -171,6 +182,7 @@ def calculate_ssim(image1, image2):
     (_, similarity) = ssim(gray1, gray2, full=True)
     return similarity
 
+
 def image_similarity(searched_string, path):
     # 이미지 읽어오기
     image1 = requests_to_image(searched_string)
@@ -195,11 +207,13 @@ def image_similarity(searched_string, path):
     similarity = np.mean(similarity_matrix) * 100
     return similarity
 
+
 def get_value_by_index(index_table, idx):
     for item in index_table:
         if item[1] == idx:
             return item[0]
     return None  # 인덱스에 해당하는 값이 없는 경우 None 반환
+
 
 # 함수 정의
 def find_image_url(path, rope):
@@ -208,7 +222,8 @@ def find_image_url(path, rope):
     if rope < 3:
         try:
             driver.switch_to.frame("callout")
-            WebDriverWait(driver, 2).until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), '로그아웃 상태 유지')]")))
+            WebDriverWait(driver, 2).until(
+                EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), '로그아웃 상태 유지')]")))
             logout_button = driver.find_element(By.XPATH, "//button[contains(text(), '로그아웃 상태 유지')]")
             logout_button.click()
             print("로그아웃 상태 유지 창 처리 완료")
@@ -226,7 +241,8 @@ def find_image_url(path, rope):
     driver.switch_to.default_content()
     # 구글 렌즈 접근
     element = WebDriverWait(driver, 10).until(
-        EC.presence_of_element_located((By.XPATH, "/html/body/div[1]/div[3]/form/div[1]/div[1]/div[1]/div/div[3]/div[4]"))
+        EC.presence_of_element_located(
+            (By.XPATH, "/html/body/div[1]/div[3]/form/div[1]/div[1]/div[1]/div/div[3]/div[4]"))
     )
 
     while True:
@@ -260,7 +276,8 @@ def find_image_url(path, rope):
     url_list.append(new_url)
 
     filename_list.append(get_value_by_index(index_table, int(os.path.splitext(os.path.basename(path))[0])))
-    taken_date, created_date, modified_date, program_name = extract_image_metadata(get_value_by_index(index_table, int(os.path.splitext(os.path.basename(path))[0])))
+    taken_date, created_date, modified_date, program_name = extract_image_metadata(
+        get_value_by_index(index_table, int(os.path.splitext(os.path.basename(path))[0])))
 
     taken_date_list.append(taken_date)
     created_date_list.append(created_date)
@@ -268,7 +285,8 @@ def find_image_url(path, rope):
     program_name_list.append(program_name)
 
     print("1/2: 검색 url 저장 완료")
-    wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="yDmH0d"]/c-wiz/div/div[2]/div/c-wiz/div/div[1]/div/div[1]/div[2]/span/div[1]/button/span/div')))
+    wait.until(EC.presence_of_element_located((By.XPATH,
+                                               '//*[@id="yDmH0d"]/c-wiz/div/div[2]/div/c-wiz/div/div[1]/div/div[1]/div[2]/span/div[1]/button/span/div')))
     target_div = driver.find_element(By.CLASS_NAME, "aah4tc")
     searched_item = target_div.find_element(By.XPATH, "./*/*/*/*/*")
     searched_string = searched_item.get_attribute("data-thumbnail-url")
@@ -282,6 +300,7 @@ def find_image_url(path, rope):
         print("2/2: 유사도 검색 할 수 없습니다")
     similarity_list.append(similarity)
     searched_url_list.append(searched_url)
+
 
 upper_path = dest_dir
 
@@ -311,7 +330,9 @@ for file in os.listdir(upper_path):
 # 데이터프레임 생성 및 저장
 driver.quit()
 
-df = pd.DataFrame({'파일명': filename_list, '구글 검색 url': url_list, '유사도_ssim방식': similarity_list, '유사 이미지 링크': searched_url_list, '찍은 날짜': taken_date_list, '만든 날짜': created_date_list, '수정한 날짜': modified_date_list, '프로그램 이름': program_name_list})
+df = pd.DataFrame(
+    {'파일명': filename_list, '구글 검색 url': url_list, '유사도_ssim방식': similarity_list, '유사 이미지 링크': searched_url_list,
+     '찍은 날짜': taken_date_list, '만든 날짜': created_date_list, '수정한 날짜': modified_date_list, '프로그램 이름': program_name_list})
 while True:
     try:
         df.to_excel(f"C:\\Users\\{user}\\Desktop\\img_links.xlsx", index=False)
