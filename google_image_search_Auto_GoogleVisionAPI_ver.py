@@ -58,7 +58,7 @@ def compress_image(image_path, output_folder, idx, fixed_height=2160):
     new_width = int(width * (fixed_height / height))
     new_height = fixed_height
     resized_img = img.resize((new_width, new_height), Image.LANCZOS)
-    resized_img.save(f"{output_folder}\\{idx}.jpg", quality=90, optimize=True)
+    resized_img.convert("RGB").save(f"{output_folder}\\{idx}.jpg", quality=90, optimize=True)
 
 
 # 멀티프로세싱을 이용한 이미지 압축 함수
