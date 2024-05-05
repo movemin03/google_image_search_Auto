@@ -1,4 +1,4 @@
-# Google Image Search Auto
+# Google Image Search Auto(영어 설명)
 
 Google Image Search Auto is an innovative program designed to search for similar images within a local folder using Google's image search functionality and compare their similarity.
 
