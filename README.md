@@ -6,6 +6,8 @@ google_image_search_Auto_GoogleVisionAPI_ver.py 의 경우, 구글 비전 api �
 구글 비전 api 를 활용하기 위한 자세한 내용은 https://cloud.google.com/vision/docs/detecting-web? 공식 문서를 참조해주십시오.
 
 유사도 검증은 SSIM 모델을 사용하고 있습니다.
+보수적으로 잡았을 때, 70 이상을 표절로 보면 좋고, 넓게 잡았을 때는 50 이상을 표절로 보면 좋습니다.
+50 으로 잡았을 경우, 같은 장소 비슷한 구도에서 찍은 경우까지 포함될 수 있습니다.
 
 아래는 pyinstaller 를 통해 exe 파일로 내보내기 위한 명령어 예시입니다.
 pyinstaller C:\Users\USER_NAME\Desktop\google_image_search_Auto.py --onefile --hidden-import os --hidden-import time --hidden-import datetime --hidden-import urllib.request --hidden-import shutil --hidden-import pandas --hidden-import numpy --hidden-import requests --hidden-import pillow --hidden-import selenium --hidden-import io --hidden-import scikit-image --hidden-import PIL.ExifTags --hidden-import multiprocessing --hidden-import opencv-python
